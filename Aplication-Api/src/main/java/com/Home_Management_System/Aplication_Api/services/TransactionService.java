@@ -63,6 +63,22 @@ public class TransactionService {
         transactionRepository.delete(buscarPorId(id));
     }
 
+    public void validarLimiteDoMes(LocalDateTime date, BigDecimal valor, String idAtual) {
+        validarOrcamento(date, valor, idAtual);
+    }
+
+    public Transaction registrarParaCompra(Purchase compra) {
+        Transaction t = new Transaction();
+        t.setPurchase(compra);
+        t.setAmount(compra.getTotalValue());
+        t.setDate(compra.getDate());
+        return criar(t);
+    }
+
+    public void excluirPorCompra(String purchaseId) {
+        buscarPorCompra(purchaseId).forEach(transactionRepository::delete);
+    }
+
     private void preencher(Transaction destino, Transaction dados, String idAtual) {
 
         if (dados.getPurchase() == null || dados.getPurchase().getId() == null

@@ -10,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -23,6 +24,8 @@ class PurchaseServiceTest {
     @Mock MarketRepository marketRepository;
     @Mock UserRepository userRepository;
     @Mock ProductRepository productRepository;
+    @Mock InventoryRepository inventoryRepository;
+    @Mock TransactionService transactionService;
     @InjectMocks PurchaseService service;
 
     private Purchase compra(List<PurchaseItem> itens) {
@@ -39,6 +42,13 @@ class PurchaseServiceTest {
         i.setUnitPrice(new BigDecimal(preco));
         i.setQuantity(qtd);
         return i;
+    }
+
+    private void referenciasValidas() {
+        Mockito.when(userRepository.findById("u1")).thenReturn(Optional.of(new User()));
+        Mockito.when(marketRepository.findById("m1")).thenReturn(Optional.of(new Market()));
+        Mockito.when(productRepository.existsById(ArgumentMatchers.any())).thenReturn(true);
+        Mockito.when(purchaseRepository.save(ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test
@@ -66,15 +76,46 @@ class PurchaseServiceTest {
     }
 
     @Test
-    void calculaTotalAutomaticamente() {
-        Mockito.when(userRepository.findById("u1")).thenReturn(Optional.of(new User()));
-        Mockito.when(marketRepository.findById("m1")).thenReturn(Optional.of(new Market()));
-        Mockito.when(productRepository.existsById(ArgumentMatchers.any())).thenReturn(true);
-        Mockito.when(purchaseRepository.save(ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+    void calculaTotalEGeraTransacao() {
+        referenciasValidas();
+        Mockito.when(inventoryRepository.findAll()).thenReturn(List.of());
+        Mockito.when(productRepository.findById(ArgumentMatchers.any())).thenReturn(Optional.of(new Product()));
 
         Purchase salva = service.salvar(compra(List.of(
                 item("p1", "5.50", 2), item("p2", "7.00", 3))));
 
         Assertions.assertEquals(new BigDecimal("32.00"), salva.getTotalValue());
+        Mockito.verify(transactionService).registrarParaCompra(salva);
+        Mockito.verify(inventoryRepository, Mockito.times(2)).save(ArgumentMatchers.any());
+    }
+
+    @Test
+    void somaQuantidadeNoEstoqueExistente() {
+        referenciasValidas();
+        Product prod = new Product(); prod.setId("p1");
+        Inventory existente = new Inventory();
+        existente.setProduct(prod);
+        existente.setQuantity(3);
+        Mockito.when(inventoryRepository.findAll()).thenReturn(List.of(existente));
+
+        service.salvar(compra(List.of(item("p1", "5.50", 2))));
+
+        Assertions.assertEquals(5, existente.getQuantity());
+    }
+
+    @Test
+    void orcamentoEstourado_retorna409_enaoGravaCompra() {
+        Mockito.when(userRepository.findById("u1")).thenReturn(Optional.of(new User()));
+        Mockito.when(marketRepository.findById("m1")).thenReturn(Optional.of(new Market()));
+        Mockito.when(productRepository.existsById(ArgumentMatchers.any())).thenReturn(true);
+        Mockito.doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "limite"))
+                .when(transactionService).validarLimiteDoMes(
+                        ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
+
+        ResponseStatusException e = Assertions.assertThrows(ResponseStatusException.class,
+                () -> service.salvar(compra(List.of(item("p1", "10.00", 1)))));
+
+        Assertions.assertEquals(409, e.getStatusCode().value());
+        Mockito.verify(purchaseRepository, Mockito.never()).save(ArgumentMatchers.any());
     }
 }
