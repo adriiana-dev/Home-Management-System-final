@@ -3,79 +3,99 @@ package com.Home_Management_System.Aplication_Api.services;
 import com.Home_Management_System.Aplication_Api.models.Product;
 import com.Home_Management_System.Aplication_Api.repositories.CategoryRepository;
 import com.Home_Management_System.Aplication_Api.repositories.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class ProductService {
 
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
+    @Autowired private ProductRepository productRepository;
+    @Autowired private CategoryRepository categoryRepository;
 
-    public ProductService(ProductRepository productRepository, CategoryRepository categoryRepository) {
-        this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
-    }
+    public List<Product> listarTodos() { return productRepository.findAll(); }
 
-    public List<Product> listarTodos() {
-        return productRepository.findAll();
-    }
+    public Optional<Product> buscarPorId(String id) { return productRepository.findById(id); }
 
-    public Product buscarPorId(String id) {
-        return productRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto não encontrado!"));
-    }
-
-    public Product salvar(Product product) {
-        if (product.getName() != null && productRepository.findByName(product.getName()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um produto cadastrado com este nome!");
+    public List<Product> buscarPorCategoria(String categoryId) {
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoria não encontrada!");
         }
-
-        if (product.getCategory() == null || product.getCategory().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O produto deve estar associado a uma categoria válida!");
-        }
-
-        categoryRepository.findById(product.getCategory().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "A categoria informada não existe no banco de dados!"));
-
-        return productRepository.save(product);
+        return productRepository.findAll().stream()
+                .filter(p -> p.getCategory() != null && categoryId.equals(p.getCategory().getId()))
+                .toList();
     }
 
-    public List<Product> salvarEmLote(List<Product> products) {
-        if (products == null || products.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A lista de produtos não pode estar vazia!");
+    public Product salvar(Product p) {
+        validarEPreencher(p);
+        if (productRepository.existsByNameIgnoreCase(p.getName())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um produto com este nome!");
         }
+        p.setId(null);
+        return productRepository.save(p);
+    }
 
-        for (Product product : products) {
-            if (product.getName() == null || product.getName().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O nome do produto é obrigatório!");
+
+    public List<Product> salvarLote(List<Product> produtos) {
+        if (produtos == null || produtos.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A lista de produtos não pode ser vazia!");
+        }
+        Set<String> nomesNoLote = new HashSet<>();
+        for (Product p : produtos) {
+            if (p == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A lista contém um item vazio!");
             }
-            if (product.getCategory() == null || product.getCategory().getId() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O produto deve estar associado a uma categoria válida!");
+            validarEPreencher(p);
+            if (!nomesNoLote.add(p.getName().trim().toLowerCase())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Nome repetido dentro do lote: " + p.getName());
             }
-
-            // Valida se a categoria informada existe no banco
-            categoryRepository.findById(product.getCategory().getId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "A categoria informada não existe!"));
+            if (productRepository.existsByNameIgnoreCase(p.getName())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Já existe um produto com o nome: " + p.getName());
+            }
+            p.setId(null);
         }
-
-        return productRepository.saveAll(products);
+        return new ArrayList<>(productRepository.saveAll(produtos));
     }
 
-    public Product atualizar(String id, Product produtoAtualizado) {
-        Product produtoExistente = buscarPorId(id);
-
-        produtoExistente.setName(produtoAtualizado.getName());
-        produtoExistente.setCategory(produtoAtualizado.getCategory());
-
-        return productRepository.save(produtoExistente);
+    public Product atualizar(String id, Product dados) {
+        Product existente = productRepository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto não encontrado!"));
+        validarEPreencher(dados);
+        productRepository.findByNameIgnoreCase(dados.getName()).ifPresent(outro -> {
+            if (!outro.getId().equals(id)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um produto com este nome!");
+            }
+        });
+        existente.setName(dados.getName());
+        existente.setCategory(dados.getCategory());
+        return productRepository.save(existente);
     }
 
     public void deletar(String id) {
-        Product produto = buscarPorId(id);
-        productRepository.delete(produto);
+        if (!productRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto não encontrado!");
+        }
+        productRepository.deleteById(id);
+    }
+
+    private void validarEPreencher(Product p) {
+        if (p.getName() == null || p.getName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O nome do produto é obrigatório!");
+        }
+        if (p.getCategory() == null || p.getCategory().getId() == null || p.getCategory().getId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A categoria (com id) é obrigatória!");
+        }
+        p.setCategory(categoryRepository.findById(p.getCategory().getId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoria não encontrada!")));
     }
 }

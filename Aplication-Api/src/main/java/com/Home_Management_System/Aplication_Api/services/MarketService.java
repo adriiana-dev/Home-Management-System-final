@@ -16,21 +16,13 @@ public class MarketService {
     @Autowired
     private MarketRepository marketRepository;
 
-    public List<Market> listarTodos() {
-        return marketRepository.findAll();
-    }
+    public List<Market> listarTodos() { return marketRepository.findAll(); }
 
-    public Optional<Market> buscarPorId(String id) {
-        return marketRepository.findById(id);
-    }
+    public Optional<Market> buscarPorId(String id) { return marketRepository.findById(id); }
 
     public Market salvar(Market market) {
-        validarCamposObrigatorios(market);
-
-        if (marketRepository.existsByCnpj(market.getCnpj())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Já existe um supermercado com o CNPJ: " + market.getCnpj());
-        }
+        validar(market);
+        market.setId(null);
         return marketRepository.save(market);
     }
 
@@ -38,38 +30,25 @@ public class MarketService {
         Market existente = marketRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Supermercado não encontrado!"));
-
-        validarCamposObrigatorios(dados);
-
-
-        marketRepository.findByCnpj(dados.getCnpj()).ifPresent(outro -> {
-            if (!outro.getId().equals(id)) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Já existe um supermercado com o CNPJ: " + dados.getCnpj());
-            }
-        });
-
-        existente.setNome(dados.getNome());
-        existente.setCnpj(dados.getCnpj());
-        existente.setTelefone(dados.getTelefone());
-        existente.setEndereco(dados.getEndereco());
-
+        validar(dados);
+        existente.setName(dados.getName());
+        existente.setLocation(dados.getLocation());
         return marketRepository.save(existente);
     }
 
     public void deletar(String id) {
         if (!marketRepository.existsById(id)) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND, "Supermercado não encontrado!");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Supermercado não encontrado!");
         }
         marketRepository.deleteById(id);
     }
 
-    private void validarCamposObrigatorios(Market market) {
-        if (market.getNome() == null || market.getNome().isBlank()
-                || market.getCnpj() == null || market.getCnpj().isBlank()) {
+    private void validar(Market m) {
+        if (vazio(m.getName()) || vazio(m.getLocation())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Nome e CNPJ do supermercado são obrigatórios!");
+                    "Nome e localização do supermercado são obrigatórios!");
         }
     }
+
+    private boolean vazio(String s) { return s == null || s.isBlank(); }
 }

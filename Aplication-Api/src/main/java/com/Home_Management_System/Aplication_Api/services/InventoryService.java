@@ -1,124 +1,65 @@
 package com.Home_Management_System.Aplication_Api.services;
-import com.Home_Management_System.Aplication_Api.repositories.UserRepository;
-import com.Home_Management_System.Aplication_Api.models.ActivityLog;
+
 import com.Home_Management_System.Aplication_Api.models.Inventory;
-import com.Home_Management_System.Aplication_Api.models.User;
-import com.Home_Management_System.Aplication_Api.repositories.ActivityLogRepository;
 import com.Home_Management_System.Aplication_Api.repositories.InventoryRepository;
 import com.Home_Management_System.Aplication_Api.repositories.ProductRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class InventoryService {
 
-    private final InventoryRepository inventoryRepository;
-    private final ProductRepository productRepository;
-    private final UserRepository userRepository;
-    private final ActivityLogRepository activityLogRepository;
+    @Autowired private InventoryRepository inventoryRepository;
+    @Autowired private ProductRepository productRepository;
 
-    public InventoryService(InventoryRepository inventoryRepository,
-                            ProductRepository productRepository,
-                            UserRepository userRepository,
-                            ActivityLogRepository activityLogRepository) {
-        this.inventoryRepository = inventoryRepository;
-        this.productRepository = productRepository;
-        this.userRepository = userRepository;
-        this.activityLogRepository = activityLogRepository;
-    }
+    public List<Inventory> listarTodos() { return inventoryRepository.findAll(); }
 
-    public List<Inventory> listarTodos() {
-        return inventoryRepository.findAll();
-    }
+    public Optional<Inventory> buscarPorId(String id) { return inventoryRepository.findById(id); }
 
-    public Inventory buscarPorId(String id) {
-        return inventoryRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item de estoque não encontrado com o ID: " + id));
-    }
-
-    public List<Inventory> buscarEstoqueBaixo() {
-        return inventoryRepository.findLowStock();
-    }
-
-    public List<Inventory> buscarPorLocal(String local) {
-        return inventoryRepository.findByStorageLocationIgnoreCase(local);
-    }
-
-    public Inventory salvar(Inventory inventory) {
-
-        if (inventory.getQuantity() == null || inventory.getQuantity() < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A quantidade em estoque não pode ser negativa.");
+    public List<Inventory> estoqueBaixo(Integer max) {
+        if (max == null || max < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O limite deve ser maior ou igual a zero!");
         }
-        if (inventory.getMinimumQuantity() != null && inventory.getMinimumQuantity() < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A quantidade mínima não pode ser negativa.");
-        }
-
-
-        if (inventory.getProduct() == null || inventory.getProduct().getId() == null ||
-                !productRepository.existsById(inventory.getProduct().getId())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto vinculado não foi encontrado no banco de dados.");
-        }
-
-        if (inventory.getResponsibleUser() == null || inventory.getResponsibleUser().getId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Usuário responsável pela operação é obrigatório.");
-        }
-        User usuario = userRepository.findById(inventory.getResponsibleUser().getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário responsável não encontrado."));
-
-        inventory.setLastUpdated(LocalDateTime.now());
-        boolean isNovo = (inventory.getId() == null);
-        Inventory itemSalvo = inventoryRepository.save(inventory);
-
-
-        String acao = isNovo ? "CADASTRO_ESTOQUE" : "ATUALIZACAO_ESTOQUE";
-        String detalhes = "Estoque do produto [" + itemSalvo.getProduct().getId() + "] ajustado para " + itemSalvo.getQuantity() + " unid.";
-        activityLogRepository.save(new ActivityLog(acao, detalhes, usuario));
-
-        return itemSalvo;
+        return inventoryRepository.findByQuantityLessThanEqual(max);
     }
 
-    public List<Inventory> salvarEmLote(List<Inventory> inventories) {
-        if (inventories == null || inventories.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A lista de inventário não pode estar vazia!");
-        }
-
-        for (Inventory inv : inventories) {
-            if (inv.getQuantity() == null || inv.getQuantity() < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A quantidade do inventário é obrigatória e não pode ser negativa!");
-            }
-            if (inv.getProduct() == null || inv.getProduct().getId() == null || inv.getProduct().getId().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O produto e o seu ID são obrigatórios!");
-            }
-            if (inv.getResponsibleUser() != null && inv.getResponsibleUser().getId() != null) {
-                // Valida se o utilizador responsável existe
-                userRepository.findById(inv.getResponsibleUser().getId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilizador responsável não encontrado!"));
-            }
-        }
-
-        return inventoryRepository.saveAll(inventories);
+    public Inventory salvar(Inventory i) {
+        validarEPreencher(i);
+        i.setId(null);
+        return inventoryRepository.save(i);
     }
 
-    public Inventory atualizar(String id, Inventory inventoryAtualizado) {
-        buscarPorId(id); // Garante que o item existe antes de atualizar
-        inventoryAtualizado.setId(id);
-        return salvar(inventoryAtualizado);
+    public Inventory atualizar(String id, Inventory dados) {
+        Inventory existente = inventoryRepository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Item de estoque não encontrado!"));
+        validarEPreencher(dados);
+        existente.setProduct(dados.getProduct());
+        existente.setQuantity(dados.getQuantity());
+        existente.setExpirationDate(dados.getExpirationDate());
+        return inventoryRepository.save(existente);
     }
 
     public void deletar(String id) {
-        Inventory item = buscarPorId(id);
-        inventoryRepository.deleteById(id);
-
-        if (item.getResponsibleUser() != null) {
-            activityLogRepository.save(new ActivityLog(
-                    "REMOCAO_ESTOQUE",
-                    "Item do estoque ID [" + id + "] foi removido.",
-                    item.getResponsibleUser()
-            ));
+        if (!inventoryRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Item de estoque não encontrado!");
         }
+        inventoryRepository.deleteById(id);
+    }
+
+    private void validarEPreencher(Inventory i) {
+        if (i.getProduct() == null || i.getProduct().getId() == null || i.getProduct().getId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O produto (com id) é obrigatório!");
+        }
+        if (i.getQuantity() == null || i.getQuantity() < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A quantidade é obrigatória e não pode ser negativa!");
+        }
+        i.setProduct(productRepository.findById(i.getProduct().getId()).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto não encontrado!")));
     }
 }
