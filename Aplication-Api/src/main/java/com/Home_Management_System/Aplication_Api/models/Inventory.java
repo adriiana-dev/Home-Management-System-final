@@ -15,7 +15,6 @@ public class Inventory {
     @DocumentReference
     @Field("productId")
     private Product product;
-
     private Integer quantity;
     private LocalDate expirationDate;
 

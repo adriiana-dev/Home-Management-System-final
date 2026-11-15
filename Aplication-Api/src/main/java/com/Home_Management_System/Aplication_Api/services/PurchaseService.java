@@ -4,6 +4,7 @@ import com.Home_Management_System.Aplication_Api.models.Inventory;
 import com.Home_Management_System.Aplication_Api.models.Product;
 import com.Home_Management_System.Aplication_Api.models.Purchase;
 import com.Home_Management_System.Aplication_Api.models.PurchaseItem;
+import com.Home_Management_System.Aplication_Api.models.Transaction;
 import com.Home_Management_System.Aplication_Api.repositories.InventoryRepository;
 import com.Home_Management_System.Aplication_Api.repositories.MarketRepository;
 import com.Home_Management_System.Aplication_Api.repositories.ProductRepository;
@@ -40,39 +41,68 @@ public class PurchaseService {
         validarPreencherECalcular(p);
         p.setId(null);
 
+        // 1) recusa a compra se estourar o orçamento do mês
         transactionService.validarLimiteDoMes(p.getDate(), p.getTotalValue(), null);
+
         Purchase salva = purchaseRepository.save(p);
-        transactionService.registrarParaCompra(salva);
-        atualizarEstoque(salva);
+        try {
+            // 2) cria a transação (isso debita o orçamento do mês)
+            transactionService.registrarParaCompra(salva);
+            // 3) soma os itens no estoque
+            ajustarEstoque(salva.getPurchasedItems(), 1);
+        } catch (RuntimeException e) {
+            // desfaz para não deixar compra órfã
+            transactionService.excluirPorCompra(salva.getId());
+            purchaseRepository.deleteById(salva.getId());
+            throw e;
+        }
         return salva;
     }
-
 
     public Purchase atualizar(String id, Purchase dados) {
         Purchase existente = purchaseRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Compra não encontrada!"));
+        List<PurchaseItem> itensAntigos = existente.getPurchasedItems();
+
         validarPreencherECalcular(dados);
+
+        String transacaoId = transactionService.buscarPorCompra(id).stream()
+                .findFirst().map(Transaction::getId).orElse(null);
+        transactionService.validarLimiteDoMes(dados.getDate(), dados.getTotalValue(), transacaoId);
+
         existente.setMarket(dados.getMarket());
         existente.setUser(dados.getUser());
         existente.setDate(dados.getDate());
         existente.setPurchasedItems(dados.getPurchasedItems());
         existente.setTotalValue(dados.getTotalValue());
-        return purchaseRepository.save(existente);
+        Purchase salva = purchaseRepository.save(existente);
+
+        transactionService.sincronizarParaCompra(salva);      // ajusta valor/data e o orçamento
+        ajustarEstoque(itensAntigos, -1);                      // estorna o estoque antigo
+        ajustarEstoque(salva.getPurchasedItems(), 1);          // aplica o novo
+        return salva;
     }
 
     public void deletar(String id) {
-        if (!purchaseRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Compra não encontrada!");
-        }
-        transactionService.excluirPorCompra(id);
+        Purchase existente = purchaseRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Compra não encontrada!"));
+        transactionService.excluirPorCompra(id);               // devolve o valor ao orçamento
+        ajustarEstoque(existente.getPurchasedItems(), -1);     // retira os itens do estoque
         purchaseRepository.deleteById(id);
     }
 
+    /**
+     * Soma (sinal = 1) ou subtrai (sinal = -1) as quantidades dos itens no estoque.
+     * Se o produto ainda não existe no estoque, cria o registro (apenas na soma).
+     * A quantidade nunca fica negativa.
+     */
+    private void ajustarEstoque(List<PurchaseItem> itens, int sinal) {
+        if (itens == null || itens.isEmpty()) return;
 
-    private void atualizarEstoque(Purchase compra) {
         Map<String, Integer> porProduto = new LinkedHashMap<>();
-        for (PurchaseItem i : compra.getPurchasedItems()) {
+        for (PurchaseItem i : itens) {
             porProduto.merge(i.getProductId(), i.getQuantity(), Integer::sum);
         }
         List<Inventory> estoque = inventoryRepository.findAll();
@@ -82,6 +112,7 @@ public class PurchaseService {
                     .findFirst()
                     .orElse(null);
             if (inv == null) {
+                if (sinal < 0) return;
                 Product produto = productRepository.findById(productId).orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Produto não encontrado: " + productId));
                 inv = new Inventory();
@@ -89,7 +120,7 @@ public class PurchaseService {
                 inv.setQuantity(qtd);
             } else {
                 int atual = inv.getQuantity() != null ? inv.getQuantity() : 0;
-                inv.setQuantity(atual + qtd);
+                inv.setQuantity(Math.max(0, atual + sinal * qtd));
             }
             inventoryRepository.save(inv);
         });

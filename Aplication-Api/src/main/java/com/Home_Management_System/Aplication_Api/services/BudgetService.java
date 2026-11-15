@@ -1,22 +1,31 @@
 package com.Home_Management_System.Aplication_Api.services;
 
 import com.Home_Management_System.Aplication_Api.models.Budget;
+import com.Home_Management_System.Aplication_Api.models.Transaction;
 import com.Home_Management_System.Aplication_Api.repositories.BudgetRepository;
+import com.Home_Management_System.Aplication_Api.repositories.TransactionRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class BudgetService {
 
-    private final BudgetRepository budgetRepository;
+    private static final Locale PT_BR = Locale.of("pt", "BR");
 
-    public BudgetService(BudgetRepository budgetRepository) {
+    private final BudgetRepository budgetRepository;
+    private final TransactionRepository transactionRepository;
+
+    public BudgetService(BudgetRepository budgetRepository, TransactionRepository transactionRepository) {
         this.budgetRepository = budgetRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     public Budget criar(Budget b) {
@@ -26,6 +35,7 @@ public class BudgetService {
         }
         b.setId(null);
         b.setLimitAmount(b.getLimitAmount().setScale(2, RoundingMode.HALF_UP));
+        b.setSpentAmount(calcularGasto(b.getMonth()));
         return budgetRepository.save(b);
     }
 
@@ -50,11 +60,37 @@ public class BudgetService {
         }
         existente.setMonth(dados.getMonth());
         existente.setLimitAmount(dados.getLimitAmount().setScale(2, RoundingMode.HALF_UP));
+        existente.setSpentAmount(calcularGasto(existente.getMonth()));
         return budgetRepository.save(existente);
     }
 
     public void excluir(String id) {
         budgetRepository.delete(buscarPorId(id));
+    }
+
+    /** Nome do mês no formato do orçamento, ex.: "Outubro/2026". */
+    public static String nomeMes(LocalDateTime date) {
+        String nome = date.getMonth().getDisplayName(TextStyle.FULL, PT_BR);
+        return Character.toUpperCase(nome.charAt(0)) + nome.substring(1) + "/" + date.getYear();
+    }
+
+    /** Soma de todas as transações do mês informado (ex.: "Outubro/2026"). */
+    public BigDecimal calcularGasto(String month) {
+        return transactionRepository.findAll().stream()
+                .filter(t -> t.getDate() != null && t.getAmount() != null
+                        && nomeMes(t.getDate()).equalsIgnoreCase(month))
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /** Recalcula e grava o gasto do orçamento correspondente à data (se houver orçamento). */
+    public void recalcularGastoPorData(LocalDateTime date) {
+        if (date == null) return;
+        budgetRepository.findByMonthIgnoreCase(nomeMes(date)).ifPresent(budget -> {
+            budget.setSpentAmount(calcularGasto(budget.getMonth()));
+            budgetRepository.save(budget);
+        });
     }
 
     private void validar(Budget b) {

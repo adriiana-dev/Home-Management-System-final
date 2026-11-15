@@ -12,32 +12,33 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.time.format.TextStyle;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 @Service
 public class TransactionService {
 
-    private static final Locale PT_BR = Locale.of("pt", "BR");
-
     private final TransactionRepository transactionRepository;
     private final BudgetRepository budgetRepository;
     private final PurchaseRepository purchaseRepository;
+    private final BudgetService budgetService;
 
     public TransactionService(TransactionRepository transactionRepository,
                               BudgetRepository budgetRepository,
-                              PurchaseRepository purchaseRepository) {
+                              PurchaseRepository purchaseRepository,
+                              BudgetService budgetService) {
         this.transactionRepository = transactionRepository;
         this.budgetRepository = budgetRepository;
         this.purchaseRepository = purchaseRepository;
+        this.budgetService = budgetService;
     }
 
     public Transaction criar(Transaction t) {
         Transaction nova = new Transaction();
         preencher(nova, t, null);
-        return transactionRepository.save(nova);
+        Transaction salva = transactionRepository.save(nova);
+        budgetService.recalcularGastoPorData(salva.getDate()); // debita o orçamento do mês
+        return salva;
     }
 
     public List<Transaction> listarTodas() { return transactionRepository.findAll(); }
@@ -55,12 +56,18 @@ public class TransactionService {
 
     public Transaction atualizar(String id, Transaction dados) {
         Transaction existente = buscarPorId(id);
+        LocalDateTime dataAntiga = existente.getDate();
         preencher(existente, dados, id);
-        return transactionRepository.save(existente);
+        Transaction salva = transactionRepository.save(existente);
+        budgetService.recalcularGastoPorData(dataAntiga);   // mês antigo (caso a data tenha mudado)
+        budgetService.recalcularGastoPorData(salva.getDate());
+        return salva;
     }
 
     public void excluir(String id) {
-        transactionRepository.delete(buscarPorId(id));
+        Transaction t = buscarPorId(id);
+        transactionRepository.delete(t);
+        budgetService.recalcularGastoPorData(t.getDate());  // devolve o valor ao orçamento
     }
 
     public void validarLimiteDoMes(LocalDateTime date, BigDecimal valor, String idAtual) {
@@ -75,8 +82,21 @@ public class TransactionService {
         return criar(t);
     }
 
+    /** Cria a transação da compra, ou atualiza a existente (usado quando a compra é editada). */
+    public Transaction sincronizarParaCompra(Purchase compra) {
+        List<Transaction> existentes = buscarPorCompra(compra.getId());
+        Transaction dados = new Transaction();
+        dados.setPurchase(compra);
+        dados.setAmount(compra.getTotalValue());
+        dados.setDate(compra.getDate());
+        if (existentes.isEmpty()) return criar(dados);
+        return atualizar(existentes.get(0).getId(), dados);
+    }
+
     public void excluirPorCompra(String purchaseId) {
-        buscarPorCompra(purchaseId).forEach(transactionRepository::delete);
+        List<Transaction> lista = buscarPorCompra(purchaseId);
+        lista.forEach(transactionRepository::delete);
+        lista.forEach(t -> budgetService.recalcularGastoPorData(t.getDate()));
     }
 
     private void preencher(Transaction destino, Transaction dados, String idAtual) {
@@ -89,10 +109,8 @@ public class TransactionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O valor deve ser maior que zero!");
         }
 
-
         Purchase compra = purchaseRepository.findById(dados.getPurchase().getId()).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Compra não encontrada!"));
-
 
         boolean duplicada = transactionRepository.findAll().stream()
                 .anyMatch(x -> x.getPurchase() != null
@@ -115,9 +133,8 @@ public class TransactionService {
         destino.setDate(date);
     }
 
-
     private void validarOrcamento(LocalDateTime date, BigDecimal novoValor, String idAtual) {
-        budgetRepository.findByMonthIgnoreCase(nomeMes(date)).ifPresent(budget -> {
+        budgetRepository.findByMonthIgnoreCase(BudgetService.nomeMes(date)).ifPresent(budget -> {
             LocalDateTime inicio = date.toLocalDate().withDayOfMonth(1).atStartOfDay().minusNanos(1);
             LocalDateTime fim = inicio.plusNanos(1).plusMonths(1);
             BigDecimal gasto = transactionRepository
@@ -131,9 +148,5 @@ public class TransactionService {
                         "Transação recusada: ultrapassa o limite do orçamento do mês!");
             }
         });
-    }
-    private String nomeMes(LocalDateTime date) {
-        String nome = date.getMonth().getDisplayName(TextStyle.FULL, PT_BR);
-        return Character.toUpperCase(nome.charAt(0)) + nome.substring(1) + "/" + date.getYear();
     }
 }
