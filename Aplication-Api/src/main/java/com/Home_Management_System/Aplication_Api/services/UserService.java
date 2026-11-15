@@ -17,6 +17,9 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ActivityLogService activityLogService;
+
     public List<User> listarTodos() { return userRepository.findAll(); }
 
     public Optional<User> buscarPorId(String id) { return userRepository.findById(id); }
@@ -26,8 +29,11 @@ public class UserService {
         if (userRepository.existsByEmail(u.getEmail())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "E-mail já cadastrado!");
         }
-        u.setId(null);
-        return userRepository.save(u);
+        User salvo = userRepository.save(u);
+        // no cadastro ainda não há cabeçalho: o próprio usuário criado é quem aparece no log
+        activityLogService.registrar("Cadastrou o usuário '" + u.getName() + "' no sistema",
+                salvo != null ? salvo.getId() : null);
+        return salvo;
     }
 
     public User atualizar(String id, User dados) {
@@ -43,14 +49,18 @@ public class UserService {
         existente.setEmail(dados.getEmail());
         existente.setPassword(dados.getPassword());
         existente.setAddressUser(dados.getAddressUser());
-        return userRepository.save(existente);
+        User salvo = userRepository.save(existente);
+        activityLogService.registrar("Atualizou os dados do usuário '" + existente.getName() + "'", id);
+        return salvo;
     }
 
     public void deletar(String id) {
         if (!userRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado!");
         }
+        String nome = userRepository.findById(id).map(User::getName).orElse("sem nome");
         userRepository.deleteById(id);
+        activityLogService.registrar("Excluiu o usuário '" + nome + "'");
     }
 
     private void validar(User u) {

@@ -22,10 +22,14 @@ public class BudgetService {
 
     private final BudgetRepository budgetRepository;
     private final TransactionRepository transactionRepository;
+    private final ActivityLogService activityLogService;
 
-    public BudgetService(BudgetRepository budgetRepository, TransactionRepository transactionRepository) {
+    public BudgetService(BudgetRepository budgetRepository,
+                         TransactionRepository transactionRepository,
+                         ActivityLogService activityLogService) {
         this.budgetRepository = budgetRepository;
         this.transactionRepository = transactionRepository;
+        this.activityLogService = activityLogService;
     }
 
     public Budget criar(Budget b) {
@@ -33,10 +37,13 @@ public class BudgetService {
         if (budgetRepository.existsByMonthIgnoreCase(b.getMonth())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um orçamento para este mês!");
         }
-        b.setId(null);
+
         b.setLimitAmount(b.getLimitAmount().setScale(2, RoundingMode.HALF_UP));
         b.setSpentAmount(calcularGasto(b.getMonth()));
-        return budgetRepository.save(b);
+        Budget salvo = budgetRepository.save(b);
+        activityLogService.registrar("Definiu o orçamento de " + b.getMonth()
+                + " em " + ActivityLogService.moeda(b.getLimitAmount()));
+        return salvo;
     }
 
     public List<Budget> listarTodos() { return budgetRepository.findAll(); }
@@ -47,8 +54,11 @@ public class BudgetService {
     }
 
     public Budget buscarPorMes(String month) {
-        return budgetRepository.findByMonthIgnoreCase(month).orElseThrow(() ->
+        Budget b = budgetRepository.findByMonthIgnoreCase(month).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "Orçamento não encontrado para o mês informado!"));
+        activityLogService.registrar("Verificou o orçamento e o saldo restante de " + b.getMonth()
+                + " (saldo: " + ActivityLogService.moeda(b.getRemainingAmount()) + ")");
+        return b;
     }
 
     public Budget atualizar(String id, Budget dados) {
@@ -61,11 +71,16 @@ public class BudgetService {
         existente.setMonth(dados.getMonth());
         existente.setLimitAmount(dados.getLimitAmount().setScale(2, RoundingMode.HALF_UP));
         existente.setSpentAmount(calcularGasto(existente.getMonth()));
-        return budgetRepository.save(existente);
+        Budget salvo = budgetRepository.save(existente);
+        activityLogService.registrar("Atualizou o orçamento de " + existente.getMonth()
+                + " para o limite de " + ActivityLogService.moeda(existente.getLimitAmount()));
+        return salvo;
     }
 
     public void excluir(String id) {
-        budgetRepository.delete(buscarPorId(id));
+        Budget existente = buscarPorId(id);
+        budgetRepository.delete(existente);
+        activityLogService.registrar("Excluiu o orçamento de " + existente.getMonth());
     }
 
     /** Nome do mês no formato do orçamento, ex.: "Outubro/2026". */

@@ -32,6 +32,7 @@ public class PurchaseService {
     @Autowired private ProductRepository productRepository;
     @Autowired private InventoryRepository inventoryRepository;
     @Autowired private TransactionService transactionService;
+    @Autowired private ActivityLogService activityLogService;
 
     public List<Purchase> listarTodas() { return purchaseRepository.findAll(); }
 
@@ -56,6 +57,11 @@ public class PurchaseService {
             purchaseRepository.deleteById(salva.getId());
             throw e;
         }
+
+        activityLogService.registrar("Registrou a compra física no supermercado " + nomeMercado(salva)
+                        + " no valor de " + ActivityLogService.moeda(salva.getTotalValue())
+                        + ", com " + salva.getPurchasedItems().size() + " item(ns) lançado(s) no estoque",
+                idUsuario(salva));
         return salva;
     }
 
@@ -81,6 +87,10 @@ public class PurchaseService {
         transactionService.sincronizarParaCompra(salva);      // ajusta valor/data e o orçamento
         ajustarEstoque(itensAntigos, -1);                      // estorna o estoque antigo
         ajustarEstoque(salva.getPurchasedItems(), 1);          // aplica o novo
+
+        activityLogService.registrar("Atualizou a compra do supermercado " + nomeMercado(salva)
+                + " (novo total: " + ActivityLogService.moeda(salva.getTotalValue())
+                + "), reajustando o estoque e o orçamento do mês", idUsuario(salva));
         return salva;
     }
 
@@ -91,6 +101,19 @@ public class PurchaseService {
         transactionService.excluirPorCompra(id);               // devolve o valor ao orçamento
         ajustarEstoque(existente.getPurchasedItems(), -1);     // retira os itens do estoque
         purchaseRepository.deleteById(id);
+
+        activityLogService.registrar("Excluiu a compra do supermercado " + nomeMercado(existente)
+                + " no valor de " + ActivityLogService.moeda(existente.getTotalValue())
+                + ", devolvendo o valor ao orçamento e retirando os itens do estoque", idUsuario(existente));
+    }
+
+    private String nomeMercado(Purchase p) {
+        return p.getMarket() != null && p.getMarket().getName() != null
+                ? p.getMarket().getName() : "não informado";
+    }
+
+    private String idUsuario(Purchase p) {
+        return p.getUser() != null ? p.getUser().getId() : null;
     }
 
     /**

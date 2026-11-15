@@ -2,6 +2,8 @@ package com.Home_Management_System.Aplication_Api.models;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.DocumentReference;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -10,6 +12,12 @@ import java.util.List;
 public class ShoppingList {
     @Id
     private String id;
+
+    // Quem criou a lista (definido na criação e mantido nas edições)
+    @DocumentReference
+    @Field("userId")
+    private User user;
+
     private String title;
     private LocalDateTime date;
     private List<ShoppingListItem> items;
@@ -18,6 +26,8 @@ public class ShoppingList {
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public LocalDateTime getDate() { return date; }
