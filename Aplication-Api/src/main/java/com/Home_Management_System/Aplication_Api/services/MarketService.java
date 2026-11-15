@@ -16,14 +16,19 @@ public class MarketService {
     @Autowired
     private MarketRepository marketRepository;
 
+    @Autowired
+    private ActivityLogService activityLogService;
+
     public List<Market> listarTodos() { return marketRepository.findAll(); }
 
     public Optional<Market> buscarPorId(String id) { return marketRepository.findById(id); }
 
     public Market salvar(Market market) {
         validar(market);
-        market.setId(null);
-        return marketRepository.save(market);
+        Market salvo = marketRepository.save(market);
+        activityLogService.registrar("Cadastrou o supermercado '" + market.getName()
+                + "' (" + market.getLocation() + ")");
+        return salvo;
     }
 
     public Market atualizar(String id, Market dados) {
@@ -33,14 +38,18 @@ public class MarketService {
         validar(dados);
         existente.setName(dados.getName());
         existente.setLocation(dados.getLocation());
-        return marketRepository.save(existente);
+        Market salvo = marketRepository.save(existente);
+        activityLogService.registrar("Atualizou os dados do supermercado '" + existente.getName() + "'");
+        return salvo;
     }
 
     public void deletar(String id) {
         if (!marketRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Supermercado não encontrado!");
         }
+        String nome = marketRepository.findById(id).map(Market::getName).orElse("sem nome");
         marketRepository.deleteById(id);
+        activityLogService.registrar("Excluiu o supermercado '" + nome + "'");
     }
 
     private void validar(Market m) {

@@ -16,6 +16,7 @@ public class CategoryService {
 
     @Autowired private CategoryRepository categoryRepository;
     @Autowired private ProductRepository productRepository;
+    @Autowired private ActivityLogService activityLogService;
 
     public List<Category> listarTodas() { return categoryRepository.findAll(); }
 
@@ -26,8 +27,9 @@ public class CategoryService {
         if (categoryRepository.existsByNameIgnoreCase(c.getName())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma categoria com este nome!");
         }
-        c.setId(null);
-        return categoryRepository.save(c);
+        Category salva = categoryRepository.save(c);
+        activityLogService.registrar("Criou a categoria '" + c.getName() + "'");
+        return salva;
     }
 
     public Category atualizar(String id, Category dados) {
@@ -39,8 +41,15 @@ public class CategoryService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe uma categoria com este nome!");
             }
         });
+        String nomeAnterior = existente.getName();
         existente.setName(dados.getName());
-        return categoryRepository.save(existente);
+        Category salva = categoryRepository.save(existente);
+        if (nomeAnterior != null && !nomeAnterior.equals(existente.getName())) {
+            activityLogService.registrar("Renomeou a categoria '" + nomeAnterior + "' para '" + existente.getName() + "'");
+        } else {
+            activityLogService.registrar("Atualizou a categoria '" + existente.getName() + "'");
+        }
+        return salva;
     }
 
     public void deletar(String id) {
@@ -53,7 +62,9 @@ public class CategoryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Não é possível excluir: existem produtos nesta categoria!");
         }
+        String nome = categoryRepository.findById(id).map(Category::getName).orElse("sem nome");
         categoryRepository.deleteById(id);
+        activityLogService.registrar("Excluiu a categoria '" + nome + "'");
     }
 
     private void validar(Category c) {

@@ -1,19 +1,33 @@
 package com.Home_Management_System.Aplication_Api.services;
 
 import com.Home_Management_System.Aplication_Api.models.ActivityLog;
+import com.Home_Management_System.Aplication_Api.models.User;
 import com.Home_Management_System.Aplication_Api.repositories.ActivityLogRepository;
 import com.Home_Management_System.Aplication_Api.repositories.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
 public class ActivityLogService {
+
+    // Nome do parâmetro de URL que identifica quem fez a ação (ex.: POST /api/products?userId=abc123)
+    public static final String PARAM_USUARIO = "userId";
+
+    private static final Logger LOG = LoggerFactory.getLogger(ActivityLogService.class);
+    private static final Locale PT_BR = Locale.of("pt", "BR");
 
     @Autowired private ActivityLogRepository activityLogRepository;
     @Autowired private UserRepository userRepository;
@@ -41,5 +55,52 @@ public class ActivityLogService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Log não encontrado!");
         }
         activityLogRepository.deleteById(id);
+    }
+
+    // =====================================================================
+    //  Registro automático das ações dos usuários (usado pelos outros serviços)
+    // =====================================================================
+
+    /** Registra uma ação usando o usuário informado no parâmetro userId da requisição. */
+    public void registrar(String acao) {
+        registrar(acao, null);
+    }
+
+    /**
+     * Registra uma ação. O usuário é o do parâmetro userId da URL; se ele não vier,
+     * usa o usuário padrão informado (ex.: o dono da compra).
+     * NUNCA derruba a operação principal: qualquer falha é só avisada no console.
+     */
+    public void registrar(String acao, String usuarioPadrao) {
+        try {
+            String userId = usuarioDaRequisicao();
+            if (userId == null || userId.isBlank()) userId = usuarioPadrao;
+            if (userId == null || userId.isBlank()) {
+                LOG.warn("Atividade não registrada (informe ?{}=<id do usuário>): {}", PARAM_USUARIO, acao);
+                return;
+            }
+            User usuario = new User();
+            usuario.setId(userId.trim());
+            ActivityLog log = new ActivityLog();
+            log.setUser(usuario);
+            log.setAction(acao);
+            salvar(log);
+        } catch (RuntimeException e) {
+            LOG.warn("Não foi possível registrar a atividade '{}': {}", acao, e.getMessage());
+        }
+    }
+
+    /** Formata valores em reais, ex.: R$ 1.250,00 */
+    public static String moeda(BigDecimal valor) {
+        BigDecimal v = valor != null ? valor : BigDecimal.ZERO;
+        return "R$ " + String.format(PT_BR, "%,.2f", v);
+    }
+
+    private String usuarioDaRequisicao() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (attrs instanceof ServletRequestAttributes sra) {
+            return sra.getRequest().getParameter(PARAM_USUARIO);
+        }
+        return null;
     }
 }
