@@ -75,7 +75,7 @@ collection:
         meta:
           id: req_03d07b2cece641aa868326c47211c22f
           created: 1794569500924
-          modified: 1794773350644
+          modified: 1794859615335
           isPrivate: false
           description: ""
           sortKey: -1794570349765
@@ -210,7 +210,7 @@ collection:
         meta:
           id: req_3f8b990c413a461aa4d847da73a6f850
           created: 1794570051586
-          modified: 1794612129407
+          modified: 1794859985520
           isPrivate: false
           description: ""
           sortKey: -1794570349758.8477
@@ -665,7 +665,7 @@ collection:
         meta:
           id: req_1e4fd76094ae428682c519af69e2ab20
           created: 1794568926481
-          modified: 1794609235236
+          modified: 1794862245861
           isPrivate: false
           description: ""
           sortKey: -1794573928187
@@ -871,7 +871,7 @@ collection:
         meta:
           id: req_605e111a438c4f9f8917a530414c5a40
           created: 1794609879809
-          modified: 1794773511572
+          modified: 1794860039108
           isPrivate: false
           description: ""
           sortKey: -1794573927937
@@ -907,7 +907,7 @@ collection:
         meta:
           id: req_6bf8e8602ccf4b60bcca11cd486923da
           created: 1794609895981
-          modified: 1794773771538
+          modified: 1794860050409
           isPrivate: false
           description: ""
           sortKey: -1794573927912
@@ -924,7 +924,7 @@ collection:
                 "city": "Feira de Santana",
                 "district": "Centro",
                 "street": "Rua Conselheiro Franco",
-                "houseNumber": 321
+                "houseNumber": 123
               }
             }
         headers:
@@ -979,7 +979,7 @@ collection:
         meta:
           id: req_af4c12d368d34d38a2244dde4978720e
           created: 1794609914273
-          modified: 1794773760383
+          modified: 1794860048175
           isPrivate: false
           description: ""
           sortKey: -1794573927918.25
@@ -1018,12 +1018,12 @@ collection:
       sortKey: -1794568849280.5781
       description: ""
     children:
-      - url: http://localhost:8080/api/inventories/low-stock?max=2
+      - url: http://localhost:8080/api/inventories/low-stock?max=2&userId=3
         name: estoque baixo (200)
         meta:
           id: req_3a1d37e09897464db8cdd276dea73af2
           created: 1794574948530
-          modified: 1794676641565
+          modified: 1794861456947
           isPrivate: false
           description: ""
           sortKey: -1794574948530
@@ -1041,7 +1041,7 @@ collection:
         meta:
           id: req_5883154d96374f2f94673f261ceb26eb
           created: 1794574951410
-          modified: 1794676479073
+          modified: 1794861096970
           isPrivate: false
           description: ""
           sortKey: -1794574951410
@@ -1077,7 +1077,7 @@ collection:
         meta:
           id: req_cc5a777f3c3e416a8d3556907c3be0ab
           created: 1794574955488
-          modified: 1794774776751
+          modified: 1794780871468
           isPrivate: false
           description: ""
           sortKey: -1794574958891.5
@@ -1088,7 +1088,7 @@ collection:
             {
             	"product": 
             	{
-            		"id":"6afa16a586ba0918363ec769"
+            		"id":"2"
             	},
             	"quantity":2,
             	"expirationDate":"2027-10-15"
@@ -1141,7 +1141,7 @@ collection:
         meta:
           id: req_9d871f9608884b9ea427b297953e7b70
           created: 1794574960026
-          modified: 1794774741395
+          modified: 1794780859219
           isPrivate: false
           description: ""
           sortKey: -1794574960026
@@ -1152,7 +1152,7 @@ collection:
             {
             	"product":
             	{
-            		"id":"6afa16a586ba0918363ec768"
+            		"id":"1"
             	},
             	"quantity": 3,
             	"expirationDate":"2027-11-13"
@@ -1254,7 +1254,7 @@ collection:
         meta:
           id: req_bd178b350fa9407d98fe3ab42db1b0d6
           created: 1794676079832
-          modified: 1794774801315
+          modified: 1794780883095
           isPrivate: false
           description: ""
           sortKey: -1794574956268.25
@@ -1265,7 +1265,7 @@ collection:
             {
             	"product": 
             	{
-            		"id":"6afa16a586ba0918363ec76e"
+            		"id":"6"
             	},
             	"quantity":5,
             	"expirationDate":"2028-10-01"
@@ -1286,7 +1286,7 @@ collection:
         meta:
           id: req_23bf8ae142754b598b2cb5c2a40174f8
           created: 1794676157871
-          modified: 1794774814598
+          modified: 1794780892361
           isPrivate: false
           description: ""
           sortKey: -1794574954956.625
@@ -1297,7 +1297,7 @@ collection:
             {
             	"product": 
             	{
-            		"id":"6afa16a586ba0918363ec770"
+            		"id":"3"
             	},
             	"quantity":4,
             	"expirationDate":"2030-01-01"
@@ -1344,7 +1344,7 @@ collection:
         meta:
           id: req_3368ad2c69b14cd39cca954a4e38b35b
           created: 1794576928491
-          modified: 1794681349748
+          modified: 1794860090115
           isPrivate: false
           description: ""
           sortKey: -1794588772153.5
@@ -1570,7 +1570,7 @@ collection:
     meta:
       id: fld_4440950f8b73487498b97672d97cfae2
       created: 1794578009580
-      modified: 1794677030796
+      modified: 1794862164752
       sortKey: -1794568849271.5938
       description: ""
     children:
@@ -1703,11 +1703,11 @@ collection:
             store: true
           rebuildPath: true
       - url: http://localhost:8080/api/purchases
-        name: criar compra (201) total 32.00
+        name: "criar compra (201) "
         meta:
           id: req_0721c7cef6f74179ba6de1c037004e7e
           created: 1794579004041
-          modified: 1794774924426
+          modified: 1794863280192
           isPrivate: false
           description: ""
           sortKey: -1794579004041
@@ -1726,14 +1726,34 @@ collection:
             	"purchasedItems":
             	[
             		{
-            			"productId":"6afa16a586ba0918363ec771",
+            			"productId":"9",
             			"unitPrice":5.50,
+            			"quantity":1
+            		},
+            		{
+            			"productId":"2",
+            			"unitPrice":7.00,
+            			"quantity":1
+            		},
+            		{
+            			"productId":"1",
+            			"unitPrice":8.50,
             			"quantity":2
             		},
             		{
-            			"productId":"6afa16a586ba0918363ec76d",
-            			"unitPrice":7.00,
-            			"quantity":3
+            			"productId":"6",
+            			"unitPrice":2.50,
+            			"quantity":1
+            		},
+            		{
+            			"productId":"3",
+            			"unitPrice":5.00,
+            			"quantity":1
+            		},
+            		{
+            			"productId":"10",
+            			"unitPrice":4.50,
+            			"quantity":2
             		}
             	]
             }
@@ -2380,6 +2400,50 @@ collection:
         headers:
           - name: Content-Type
             value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: ShoppingList (lista de compra )
+    meta:
+      id: fld_63e2a7316906427f9ccbc2acb61a3f12
+      created: 1794862112198
+      modified: 1794862751843
+      sortKey: -1794568849271.9844
+      description: ""
+    children:
+      - url: http://localhost:8080/api/shopping-lists
+        name: lista de compras
+        meta:
+          id: req_87b1f2e986d3472c8c571e435020834a
+          created: 1794862118743
+          modified: 1794862541384
+          isPrivate: false
+          description: ""
+          sortKey: -1794862118743
+        method: GET
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: http://localhost:8080/api/inventories/low-stock?max=5&adicionarNaLista=true&userId=3
+        name: criar lista de compra
+        meta:
+          id: req_c5a1212e49454b78be88469ea6ae0f55
+          created: 1794862395124
+          modified: 1794863198724
+          isPrivate: false
+          description: ""
+          sortKey: -1794862395124
+        method: POST
         settings:
           renderRequestBody: true
           encodeUrl: true

@@ -83,13 +83,12 @@ public class BudgetService {
         activityLogService.registrar("Excluiu o orçamento de " + existente.getMonth());
     }
 
-    /** Nome do mês no formato do orçamento, ex.: "Outubro/2026". */
+
     public static String nomeMes(LocalDateTime date) {
         String nome = date.getMonth().getDisplayName(TextStyle.FULL, PT_BR);
         return Character.toUpperCase(nome.charAt(0)) + nome.substring(1) + "/" + date.getYear();
     }
 
-    /** Soma de todas as transações do mês informado (ex.: "Outubro/2026"). */
     public BigDecimal calcularGasto(String month) {
         return transactionRepository.findAll().stream()
                 .filter(t -> t.getDate() != null && t.getAmount() != null
@@ -99,7 +98,6 @@ public class BudgetService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
-    /** Recalcula e grava o gasto do orçamento correspondente à data (se houver orçamento). */
     public void recalcularGastoPorData(LocalDateTime date) {
         if (date == null) return;
         budgetRepository.findByMonthIgnoreCase(nomeMes(date)).ifPresent(budget -> {

@@ -106,9 +106,9 @@ class PurchaseServiceTest {
     @Test
     void orcamentoEstourado_retorna409_enaoGravaCompra() {
         Mockito.when(userRepository.findById("u1")).thenReturn(Optional.of(new User()));
-        Mockito.when(marketRepository.findById("m1")).thenReturn(Optional.of(new Market()));
-        Mockito.when(productRepository.existsById(ArgumentMatchers.any())).thenReturn(true);
-        Mockito.doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "limite"))
+        Mockito.when(marketRepository.findByIsById(ArgumentMatchers.any())).thenReturn(true);
+        Mockito.doThrow(new ResponseStatusExd("m1")).thenReturn(Optional.of(new Market()));
+        Mockito.when(productRepository.existception(HttpStatus.CONFLICT, "limite"))
                 .when(transactionService).validarLimiteDoMes(
                         ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any());
 
