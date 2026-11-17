@@ -22,9 +22,12 @@ public class InventoryController {
         return ResponseEntity.ok(inventoryService.listarTodos());
     }
 
-    @GetMapping("/low-stock")
-    public ResponseEntity<List<Inventory>> estoqueBaixo(@RequestParam Integer max) {
-        return ResponseEntity.ok(inventoryService.estoqueBaixo(max));
+    @PostMapping("/low-stock")
+    public ResponseEntity<List<Inventory>> estoqueBaixo(
+            @RequestParam Integer max,
+            @RequestParam(defaultValue = "false") boolean adicionarNaLista,
+            @RequestParam(required = false) String userId) {
+        return ResponseEntity.ok(inventoryService.estoqueBaixo(max, adicionarNaLista, userId));
     }
 
     @GetMapping("/{id}")

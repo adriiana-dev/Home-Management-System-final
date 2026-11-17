@@ -13,7 +13,7 @@ public class ShoppingList {
     @Id
     private String id;
 
-    // Quem criou a lista (definido na criação e mantido nas edições)
+
     @DocumentReference
     @Field("userId")
     private User user;

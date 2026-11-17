@@ -37,7 +37,7 @@ public class TransactionService {
         Transaction nova = new Transaction();
         preencher(nova, t, null);
         Transaction salva = transactionRepository.save(nova);
-        budgetService.recalcularGastoPorData(salva.getDate()); // debita o orçamento do mês
+        budgetService.recalcularGastoPorData(salva.getDate());
         return salva;
     }
 
@@ -82,7 +82,7 @@ public class TransactionService {
         return criar(t);
     }
 
-    /** Cria a transação da compra, ou atualiza a existente (usado quando a compra é editada). */
+
     public Transaction sincronizarParaCompra(Purchase compra) {
         List<Transaction> existentes = buscarPorCompra(compra.getId());
         Transaction dados = new Transaction();

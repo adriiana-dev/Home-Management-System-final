@@ -23,6 +23,8 @@ import java.util.Optional;
 @Service
 public class ShoppingListService {
 
+    public static final String TITULO_LISTA_REPOSICAO = "Reposição - Estoque baixo";
+
     @Autowired private ShoppingListRepository shoppingListRepository;
     @Autowired private ProductRepository productRepository;
     @Autowired private UserRepository userRepository;
@@ -59,6 +61,60 @@ public class ShoppingListService {
 
         registrarMudancas(tituloAnterior, itensAntigos, existente, idDoCriador(existente));
         return salva;
+    }
+
+    /**
+     * Coloca produtos na lista "Reposição - Estoque baixo" (criada se ainda não existir).
+     * - produto que ainda não está na lista: é adicionado;
+     * - produto que já está e não foi comprado: fica como está (sem duplicar);
+     * - produto que já foi marcado como comprado: volta para "não comprado".
+     */
+    public ShoppingList adicionarItensDeReposicao(List<ShoppingListItem> novosItens, String userId) {
+        User criador = new User();
+        criador.setId(userId);
+        buscarUsuario(criador); // 400 se faltar o id, 404 se o usuário não existir
+
+        if (novosItens == null || novosItens.isEmpty()) return null;
+
+        ShoppingList existente = shoppingListRepository.findAll().stream()
+                .filter(l -> TITULO_LISTA_REPOSICAO.equalsIgnoreCase(l.getTitle()))
+                .findFirst().orElse(null);
+
+        if (existente == null) {
+            ShoppingList nova = new ShoppingList();
+            nova.setUser(criador);
+            nova.setTitle(TITULO_LISTA_REPOSICAO);
+            nova.setItems(new ArrayList<>(novosItens));
+            return salvar(nova);
+        }
+
+        List<ShoppingListItem> mesclados = new ArrayList<>();
+        if (existente.getItems() != null) {
+            for (ShoppingListItem i : existente.getItems()) mesclados.add(copia(i));
+        }
+        for (ShoppingListItem novo : novosItens) {
+            ShoppingListItem atual = mesclados.stream()
+                    .filter(m -> novo.getProductId().equals(m.getProductId()))
+                    .findFirst().orElse(null);
+            if (atual == null) {
+                mesclados.add(copia(novo));
+            } else if (Boolean.TRUE.equals(atual.getIsPurchased())) {
+                atual.setIsPurchased(false);
+                atual.setQuantityNeeded(novo.getQuantityNeeded());
+            }
+        }
+        ShoppingList dados = new ShoppingList();
+        dados.setTitle(existente.getTitle());
+        dados.setItems(mesclados);
+        return atualizar(existente.getId(), dados);
+    }
+
+    private ShoppingListItem copia(ShoppingListItem i) {
+        ShoppingListItem c = new ShoppingListItem();
+        c.setProductId(i.getProductId());
+        c.setQuantityNeeded(i.getQuantityNeeded());
+        c.setIsPurchased(i.getIsPurchased());
+        return c;
     }
 
     public void deletar(String id) {

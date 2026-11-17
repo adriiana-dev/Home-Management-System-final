@@ -23,7 +23,6 @@ import java.util.Optional;
 @Service
 public class ActivityLogService {
 
-    // Nome do parâmetro de URL que identifica quem fez a ação (ex.: POST /api/products?userId=abc123)
     public static final String PARAM_USUARIO = "userId";
 
     private static final Logger LOG = LoggerFactory.getLogger(ActivityLogService.class);
@@ -57,20 +56,10 @@ public class ActivityLogService {
         activityLogRepository.deleteById(id);
     }
 
-    // =====================================================================
-    //  Registro automático das ações dos usuários (usado pelos outros serviços)
-    // =====================================================================
-
-    /** Registra uma ação usando o usuário informado no parâmetro userId da requisição. */
     public void registrar(String acao) {
         registrar(acao, null);
     }
 
-    /**
-     * Registra uma ação. O usuário é o do parâmetro userId da URL; se ele não vier,
-     * usa o usuário padrão informado (ex.: o dono da compra).
-     * NUNCA derruba a operação principal: qualquer falha é só avisada no console.
-     */
     public void registrar(String acao, String usuarioPadrao) {
         try {
             String userId = usuarioDaRequisicao();
@@ -90,7 +79,6 @@ public class ActivityLogService {
         }
     }
 
-    /** Formata valores em reais, ex.: R$ 1.250,00 */
     public static String moeda(BigDecimal valor) {
         BigDecimal v = valor != null ? valor : BigDecimal.ZERO;
         return "R$ " + String.format(PT_BR, "%,.2f", v);

@@ -64,7 +64,6 @@ public class ProductService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Já existe um produto com o nome: " + p.getName());
             }
-            p.setId(null);
         }
         List<Product> salvos = new ArrayList<>(productRepository.saveAll(produtos));
         activityLogService.registrar("Cadastrou " + produtos.size() + " produto(s) em lote: " + resumoNomes(produtos));
